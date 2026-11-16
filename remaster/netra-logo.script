@@ -1,0 +1,44 @@
+# Background biru gelap
+Window.SetBackgroundTopColor(0.02, 0.05, 0.09);
+Window.SetBackgroundBottomColor(0.02, 0.05, 0.09);
+
+# --- Logo Utama (300 x 300) ---
+logo_image = Image("boot.png").Scale(300, 300);
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetX((Window.GetWidth() - logo_image.GetWidth()) / 2);
+logo_sprite.SetY((Window.GetHeight() - logo_image.GetHeight()) / 2);
+logo_sprite.SetOpacity(1);
+
+# --- Watermark di Tengah Bawah ---
+watermark_image = Image("watermark.png").Scale(300, 100);
+watermark_sprite = Sprite(watermark_image);
+watermark_sprite.SetX((Window.GetWidth() - watermark_image.GetWidth()) / 2);
+watermark_sprite.SetY(Window.GetHeight() - watermark_image.GetHeight() - 80);
+watermark_sprite.SetOpacity(1);
+
+# --- Konfigurasi Spinner 8 Frame (Ukuran 64x64) ---
+for (i = 1; i <= 8; i++) {
+    spinner_images[i] = Image("spinner-" + i + ".png");
+}
+
+spinner_sprite = Sprite();
+spinner_index = 0;
+
+fun refresh_callback() {
+    spinner_index++;
+    if (spinner_index > 8) {
+        spinner_index = 1;
+    }
+    
+    spinner_sprite.SetImage(spinner_images[spinner_index]);
+    
+    spinner_width = spinner_images[1].GetWidth();
+    spinner_height = spinner_images[1].GetHeight();
+    
+    spinner_sprite.SetX((Window.GetWidth() - spinner_width) / 2);
+    spinner_sprite.SetY((Window.GetHeight() / 2) + 140); 
+    spinner_sprite.SetOpacity(1);
+}
+
+# Daftarkan fungsi refresh di baris paling akhir
+Plymouth.SetRefreshFunction(refresh_callback);

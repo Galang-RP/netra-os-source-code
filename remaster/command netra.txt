@@ -1,0 +1,336 @@
+1. //update package dulu mas
+add-apt-repository -y universe
+add-apt-repository -y multiverse
+add-apt-repository -y restricted
+apt update && apt upgrade -y
+
+2. //hapus paket gk penting
+- apt purge thunderbird* libreoffice* totem* rhythmbox* transmission-common* transmission-gtk* motd-news* shotwell* Shotwell-common* firefox* gnome-characters* motd-news-config*
+- apt remove gamemode
+- apt autoremove
+
+3. //install paket netra
+- apt install wireshark nmap traceroute mtr-tiny dnsutils net-tools iperf3 remmina putty ipcalc tcpdump openvpn openssh-server
+
+4. //install brave
+sudo apt install curl
+sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+sudo curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
+sudo apt update
+sudo apt install brave-browser
+
+5. //custom plymouth
+mkdir -p /usr/share/plymouth/themes/netra-logo
+
+cd /usr/share/plymouth/themes/netra-logo
+
+\\\\copy file boot.png, watermark.png, dan 1-16.jpg ke direktori diatas itu. trs:
+
+////1 command
+cat > /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth <<'EOF'
+[Plymouth Theme]
+Name=Netra Logo Boot
+Description=Netra OS Boot Splash
+ModuleName=script
+[script]
+ImageDir=/usr/share/plymouth/themes/netra-logo
+ScriptFile=/usr/share/plymouth/themes/netra-logo/netra-logo.script
+EOF
+
+////1 command
+cat > /usr/share/plymouth/themes/netra-logo/netra-logo.script <<'EOF'
+# Background biru gelap
+Window.SetBackgroundTopColor(0.02, 0.05, 0.09);
+Window.SetBackgroundBottomColor(0.02, 0.05, 0.09);
+# Perkecil logo menjadi 300 x 300
+logo_image = Image("boot.png").Scale(300, 300);
+# Tampilkan logo
+logo_sprite = Sprite(logo_image);
+# Posisikan tepat di tengah layar
+logo_sprite.SetX((Window.GetWidth() - logo_image.GetWidth()) / 2);
+logo_sprite.SetY((Window.GetHeight() - logo_image.GetHeight()) / 2);
+logo_sprite.SetOpacity(1);
+EOF
+
+
+nano /usr/share/plymouth/themes/netra-logo/netra-logo.script
+
+# --- Tambahan Watermark Animasi 16 Frame (1.png - 16.png) ---
+total_frames = 16;
+wm_width = 300;   # Sesuaikan lebar gambar
+wm_height = 100;  # Sesuaikan tinggi gambar
+
+# Muat file 1.png sampai 16.png ke dalam array indeks 0-15
+for (i = 0; i < total_frames; i++) {
+    wm_images[i] = Image((i + 1) + ".png").Scale(wm_width, wm_height);
+}
+
+# Buat sprite dan posisikan di tengah bawah layar
+wm_sprite = Sprite();
+wm_sprite.SetImage(wm_images[0]);
+wm_sprite.SetX((Window.GetWidth() - wm_width) / 2);
+wm_sprite.SetY(Window.GetHeight() - wm_height - 80);
+wm_sprite.SetOpacity(1);
+
+# Variabel penghitung frame dan kecepatan animasi
+wm_frame = 0;
+wm_tick = 0;
+
+fun refresh_callback () {
+    wm_tick++;
+    # Ganti frame setiap 3 tick (~16 FPS, total ~1 detik per siklus).
+    # Perkecil angka 3 ke 2 agar lebih cepat, atau perbesar ke 4/5 agar lebih lambat.
+    if (wm_tick % 3 == 0) {
+        wm_sprite.SetImage(wm_images[wm_frame]);
+        wm_frame = (wm_frame + 1) % total_frames;
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+
+
+////1 command
+update-alternatives --install \
+/usr/share/plymouth/themes/default.plymouth \
+default.plymouth \
+/usr/share/plymouth/themes/netra-logo/netra-logo.plymouth \
+200
+
+////1 command
+update-alternatives --set default.plymouth \
+/usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
+
+////(hasil komen dibawah di ss!)
+////1 command
+readlink -f /usr/share/plymouth/themes/default.plymouth
+update-alternatives --query default.plymouth
+
+6. //ganti wallpaper
+cd /usr/share/backgrounds
+-trs copy file foto.png ke dir itu, trs:
+cp foto.png ubuntu-default-greyscale-wallpaper.png
+cp foto.png ubuntu-wallpaper-d.png
+mv foto.png warty-final-ubuntu.png
+
+7. identitas 
+nano /etc/os-release
+ubah:
+pretty_name jadi Netra OS 1.0 LTS AMD64. Name jdi Netra OS, version jdi 1.0 LTS , id jadi netraos, version_id jdi 1.0
+selain itu abaikan, klo yg ditulis gk ada ya gausah, jgn buat sendiri.
+
+8. welcome text?
+nano /etc/issue
+ubah jdi:
+Netra OS 1.0 LTS \n \l
+
+trs buka nano /etc/issue.net
+ubah jadi: Netra OS 1.0 LTS
+
+9. //ganti login logo
+cd /usr/share/pixmaps
+mv watermark.png /usr/share/pixmaps/custom-login-logo.png
+chmod 644 /usr/share/pixmaps/custom-login-logo.png
+
+mkdir -p /etc/dconf/profile
+nano /etc/dconf/profile/gdm
+
+user-db:user
+system-db:gdm
+file-db:/usr/share/gdm/greeter-dconf-defaults
+
+//////
+mkdir -p /etc/dconf/db/gdm.d
+nano /etc/dconf/db/gdm.d/01-custom-logo
+
+[org/gnome/login-screen]
+logo='/usr/share/pixmaps/custom-login-logo.png'
+
+10. //ganti start logo
+apt install -y gnome-shell-extensions papirus-icon-theme fonts-jetbrains-mono
+
+mkdir -p /usr/share/themes/CustomAppIcon/gnome-shell
+cd /usr/share/themes/CustomAppIcon/gnome-shell
+# Pastikan file logo-netra.svg sudah ditaruh di folder di atas, lalu ubah namanya:
+mv logo-netra.svg /usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg
+
+nano /usr/share/themes/CustomAppIcon/gnome-shell/gnome-shell.css
+#dashtodockContainer .show-apps,
+.show-apps {
+  padding: 0px !important;
+  margin: 0px !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon,
+.show-apps .overview-icon {
+  width: 56px !important;
+  height: 56px !important;
+  padding: 0px !important;
+  margin: 0px !important;
+  margin-bottom: 5px !important;
+  border-radius: 12px !important;
+  background-image: url("file:///usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg") !important;
+  background-size: 54px 54px !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon StIcon,
+.show-apps .overview-icon StIcon {
+  color: transparent !important;
+  icon-size: 0px !important;
+  width: 0px !important;
+  height: 0px !important;
+  opacity: 0 !important;
+}
+
+#panel {
+  background-color: rgba(15, 23, 30, 0.88) !important;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.25) !important;
+  height: 30px !important;
+  font-size: 10.5pt !important;
+}
+
+#panel .panel-button {
+  color: #e2e8f0 !important;
+}
+
+#panel .panel-button:hover,
+#panel .panel-button:active,
+#panel .panel-button:checked {
+  background-color: rgba(56, 189, 248, 0.18) !important;
+  color: #38bdf8 !important;
+  border-radius: 6px !important;
+}
+
+#dashtodockContainer #dash .dash-background {
+  background-color: rgba(15, 23, 30, 0.85) !important;
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  border-radius: 16px !important;
+}
+
+#dashtodockContainer .app-well-app-running-dot {
+  background-color: #38bdf8 !important;
+  width: 6px !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+}
+
+nano /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
+
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+gtk-theme='Yaru-dark'
+icon-theme='Papirus-Dark'
+accent-color='teal'
+font-name='Ubuntu Sans 10.5'
+monospace-font-name='JetBrains Mono 10.5'
+clock-show-seconds=true
+clock-show-weekday=true
+
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/warty-final-ubuntu.png'
+picture-uri-dark='file:///usr/share/backgrounds/warty-final-ubuntu.png'
+
+[org.gnome.shell.extensions.dash-to-dock]
+dock-position='BOTTOM'
+dock-fixed=false
+extend-height=false
+dash-max-icon-size=44
+show-trash=false
+show-mounts=false
+
+[org.gnome.shell.extensions.ding]
+show-home=false
+
+[org.gnome.shell]
+disable-extension-version-validation=true
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['brave-browser.desktop', 'org.wireshark.Wireshark.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop']
+
+[org.gnome.shell:ubuntu]
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+
+[org.gnome.shell.extensions.user-theme]
+name='CustomAppIcon'
+
+chmod -R 755 /usr/share/themes/CustomAppIcon
+chmod 644 /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
+glib-compile-schemas /usr/share/glib-2.0/schemas/
+
+
+
+
+11. //skrip web
+////1 command
+cat << 'EOF' > /usr/local/bin/netra-welcome.sh
+#!/bin/bash
+
+# Tunggu selama proses installer utama, oem-config, atau gnome-initial-setup masih aktif berjalan
+while pgrep -x "gnome-initial-setup" > /dev/null || pgrep -x "oem-config" > /dev/null || pgrep -f "subiquity" > /dev/null; do
+    sleep 4
+done
+
+# Penanda agar skrip hanya berjalan sekali untuk setiap pengguna
+MARKER="$HOME/.config/netra-welcome-done"
+
+# Periksa apakah skrip sudah pernah dijalankan sebelumnya
+if [ -f "$MARKER" ]; then
+    exit 0
+fi
+
+# Beri jeda tambahan setelah setup benar-benar tertutup agar desktop stabil
+sleep 10
+
+# Buka halaman GitHub Netra OS
+if xdg-open "https://netra-os.vercel.app" >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config"
+    touch "$MARKER"
+fi
+
+exit 0
+EOF
+
+////
+chmod +x /usr/local/bin/netra-welcome.sh
+mkdir -p /etc/xdg/autostart
+
+////1 command
+cat << 'EOF' > /etc/xdg/autostart/netra-welcome.desktop
+[Desktop Entry]
+Type=Application
+Name=Netra OS Welcome
+Comment=Open Netra OS Welcome Page
+Exec=/usr/local/bin/netra-welcome.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+
+
+
+
+////
+LAST// FINISHING
+dconf update
+update-initramfs -u
+
+
+======lanjut build.
+
+
+
+====backup
+12. fav apps
+mkdir -p /etc/dconf/db/local.d/
+
+nano /etc/dconf/db/local.d/01-favorite-apps
+
+[org/gnome/shell]
+favorite-apps=['brave-browser.desktop', 'org.wireshark.Wireshark.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'yelp.desktop', 'org.gnome.Nautilus.desktop']
+
+/////
+nano /etc/dconf/profile/user
+
+user-db:user
+system-db:local

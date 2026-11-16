@@ -1,0 +1,52 @@
+apt update
+apt install -y gnome-shell-extensions
+
+mkdir -p /usr/share/themes/CustomAppIcon/gnome-shell
+
+cp logo-netra.svg /usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg
+
+nano /usr/share/themes/CustomAppIcon/gnome-shell/gnome-shell.css
+
+#dashtodockContainer .show-apps,
+.show-apps {
+  padding: 0px !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon,
+.show-apps .overview-icon {
+  width: 50px !important;
+  height: 50px !important;
+  padding: 0px !important;
+  margin: 0px !important;
+  background-image: url("file:///usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg") !important;
+  background-size: 48px 48px !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon StIcon,
+.show-apps .overview-icon StIcon {
+  color: transparent !important;
+  icon-size: 0px !important;
+  width: 0px !important;
+  height: 0px !important;
+  opacity: 0 !important;
+}
+
+nano /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
+
+[org.gnome.shell]
+disable-extension-version-validation=true
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@://github.com']
+
+[org.gnome.shell:ubuntu]
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@://github.com']
+
+[org.gnome.shell.extensions.user-theme]
+name='CustomAppIcon'
+
+
+
+glib-compile-schemas /usr/share/glib-2.0/schemas/
+chmod -R 755 /usr/share/themes/CustomAppIcon
+chmod 644 /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
