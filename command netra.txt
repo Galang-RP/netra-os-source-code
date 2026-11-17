@@ -26,12 +26,11 @@ sudo apt install brave-browser
 
 5. //custom plymouth
 mkdir -p /usr/share/plymouth/themes/netra-logo
-
 cd /usr/share/plymouth/themes/netra-logo
 
 \\\\copy file boot.png, watermark.png, dan 1-16.png ke direktori diatas itu. trs:
 
-////1 command
+
 nano /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
 [Plymouth Theme]
 Name=Netra Logo Boot
@@ -100,19 +99,18 @@ Plymouth.SetRefreshFunction(refresh_callback);
 
 
 
-////1 command
+
 update-alternatives --install \
 /usr/share/plymouth/themes/default.plymouth \
 default.plymouth \
 /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth \
 200
 
-////1 command
+
 update-alternatives --set default.plymouth \
 /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
 
-////(hasil komen dibawah di ss!)
-////1 command
+
 readlink -f /usr/share/plymouth/themes/default.plymouth
 update-alternatives --query default.plymouth
 
@@ -134,11 +132,12 @@ nano /etc/issue
 ubah jdi:
 Netra OS 1.0 LTS \n \l
 
-trs buka nano /etc/issue.net
+nano /etc/issue.net
 ubah jadi: Netra OS 1.0 LTS
 
 9. //ganti login logo
 cd /usr/share/pixmaps
+////copy watermark.png ke dir aktif
 mv watermark.png /usr/share/pixmaps/custom-login-logo.png
 chmod 644 /usr/share/pixmaps/custom-login-logo.png
 
@@ -314,28 +313,23 @@ X-GNOME-Autostart-enabled=true
 
 12. fav apps
 mkdir -p /etc/dconf/db/local.d/
-
 nano /etc/dconf/db/local.d/01-favorite-apps
 
 [org/gnome/shell]
 favorite-apps=['brave-browser.desktop', 'org.wireshark.Wireshark.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'yelp.desktop']
 
-/////
+
 nano /etc/dconf/profile/user
 
 user-db:user
 system-db:local
 
 
-////
+
 LAST// FINISHING
 dconf update
 update-initramfs -u -k all
 
 
 ======lanjut build.
-
-
-
-====backup
 
