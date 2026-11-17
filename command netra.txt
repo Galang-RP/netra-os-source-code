@@ -29,7 +29,7 @@ mkdir -p /usr/share/plymouth/themes/netra-logo
 
 cd /usr/share/plymouth/themes/netra-logo
 
-\\\\copy file boot.png, watermark.png, dan 1-16.jpg ke direktori diatas itu. trs:
+\\\\copy file boot.png, watermark.png, dan 1-16.png ke direktori diatas itu. trs:
 
 ////1 command
 nano /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
@@ -54,6 +54,22 @@ logo_sprite = Sprite(logo_image);
 logo_sprite.SetX((Window.GetWidth() - logo_image.GetWidth()) / 2);
 logo_sprite.SetY((Window.GetHeight() - logo_image.GetHeight()) / 2);
 logo_sprite.SetOpacity(1);
+
+
+message_sprite = Sprite();
+
+
+msg_x = (Window.GetWidth() - 400) / 2;
+msg_y = (Window.GetHeight() / 2) + 160;
+
+message_sprite.SetPosition(msg_x, msg_y, 10000);
+
+fun message_callback (text) {
+    my_image = Image.Text(text, 0.8, 0.9, 1.0, 1.0);
+    message_sprite.SetImage(my_image);
+}
+
+Plymouth.SetMessageFunction(message_callback);
 
 total_frames = 16;
 wm_width = 300;
@@ -314,7 +330,7 @@ system-db:local
 ////
 LAST// FINISHING
 dconf update
-update-initramfs -u
+update-initramfs -u -k all
 
 
 ======lanjut build.
