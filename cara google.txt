@@ -1,0 +1,448 @@
+# ==========================================
+# BAGIAN 1: PERSIAPAN & MASUK CHROOT
+# ==========================================
+
+# 1. Bersihkan sisa folder kerja lama
+sudo umount -lf ~/netra/root/dev/pts ~/netra/root/dev ~/netra/root/run ~/netra/root/proc ~/netra/root/sys ~/netra/root 2>/dev/null
+rm -rf ~/netra/iso ~/netra/root ~/netra/netra-os1.0-desktop-amd64.iso
+
+# 2. Install tools remastering
+sudo apt update && sudo apt install -y squashfs-tools xorriso
+
+# 3. Buat struktur direktori kerja (menggunakan folder 'iso')
+mkdir -p ~/netra/iso ~/netra/root
+
+# 4. Ekstrak seluruh isi ISO asli ke folder iso
+cd ~/netra
+xorriso -osirrox on -indev ubuntu-26.04.1-desktop-amd64.iso -extract / ~/netra/iso
+chmod -R u+w ~/netra/iso
+
+# 5. Ekstrak file inti sistem (minimal.squashfs) langsung ke folder root
+sudo unsquashfs -f -d ~/netra/root ~/netra/iso/casper/minimal.squashfs
+
+# 6. Mount sistem virtual untuk chroot
+sudo mount --bind /dev ~/netra/root/dev
+sudo mount --bind /dev/pts ~/netra/root/dev/pts
+sudo mount -t proc proc ~/netra/root/proc
+sudo mount -t sysfs sys ~/netra/root/sys
+sudo mount -t tmpfs tmpfs ~/netra/root/run
+
+# 7. Salin konfigurasi DNS dengan aman
+sudo rm -f ~/netra/root/etc/resolv.conf
+sudo cp /etc/resolv.conf ~/netra/root/etc/resolv.conf
+
+# 8. Masuk ke lingkungan Chroot
+sudo chroot ~/netra/root /bin/bash
+
+
+\\\\\\\\\
+Bagian 2: Konfigurasi Sistem di Dalam Chroot
+
+===== CONFIG CHROOT =====
+
+1. Hapus Permanen Firefox & Thunderbird 
+///Hapus paket APT Firefox dan Thunderbird.
+apt update
+apt purge -y firefox* thunderbird*
+apt autoremove --purge -y
+
+///Hapus cache Snap Firefox/Thunderbird (Wajib agar tidak terinstal otomatis saat booting).
+rm -rf /var/lib/snapd/seed/snaps/firefox*
+rm -rf /var/lib/snapd/seed/snaps/thunderbird*
+rm -rf /var/snap/firefox /var/snap/thunderbird
+
+///Hapus referensi di file seed.yaml. Agar sistem tidak error mencari file snap yang baru saja dihapus, hapus baris terkait firefox dan thunderbird dari daftar seed:
+
+sed -i '/name: firefox/,+3d' /var/lib/snapd/seed/seed.yaml
+sed -i '/name: thunderbird/,+3d' /var/lib/snapd/seed/seed.yaml
+
+
+2. update and upgrade 
+add-apt-repository -y universe multiverse restricted
+apt update 
+apt upgrade -y
+
+3. fix kdump-tools
+apt purge -y kdump-tools
+dpkg --configure -a
+apt install -f -y
+
+4. remove paket gk penting
+apt purge thunderbird* libreoffice* totem* rhythmbox* transmission-common* transmission-gtk* motd-news* shotwell* Shotwell-common* firefox* gnome-characters* motd-news-config*
+apt remove gamemode
+apt autoremove
+
+5. install aplikasi keperluan netra
+apt install wireshark nmap traceroute mtr-tiny dnsutils net-tools iperf3 remmina putty ipcalc tcpdump openvpn openssh-server gnome-terminal
+
+6. install brave
+sudo apt install curl
+sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+sudo curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
+sudo apt update
+sudo apt install brave-browser
+
+7. custom Plymouth
+mkdir -p /usr/share/plymouth/themes/netra-logo
+cd /usr/share/plymouth/themes/netra-logo
+
+///buka terminal lain. dan ketik ini:
+sudo cp netra-source-code/remaster/{boot.png,watermark.png,{1..16}.png} ~/netra/root/usr/share/plymouth/themes/netra-logo/
+
+nano /usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
+
+[Plymouth Theme]
+Name=Netra Logo Boot
+Description=Netra OS Boot Splash
+ModuleName=script
+[script]
+ImageDir=/usr/share/plymouth/themes/netra-logo
+ScriptFile=/usr/share/plymouth/themes/netra-logo/netra-logo.script
+
+
+nano /usr/share/plymouth/themes/netra-logo/netra-logo.script
+
+Window.SetBackgroundTopColor(0.02, 0.05, 0.09);
+Window.SetBackgroundBottomColor(0.02, 0.05, 0.09);
+
+logo_image = Image("boot.png").Scale(300, 300);
+
+logo_sprite = Sprite(logo_image);
+
+logo_sprite.SetX((Window.GetWidth() - logo_image.GetWidth()) / 2);
+logo_sprite.SetY((Window.GetHeight() - logo_image.GetHeight()) / 2);
+logo_sprite.SetOpacity(1);
+
+
+message_sprite = Sprite();
+
+msg_x = (Window.GetWidth() - 400) / 2;
+msg_y = (Window.GetHeight() / 2) + 160;
+
+message_sprite.SetPosition(msg_x, msg_y, 10000);
+
+fun message_callback (text) {
+    my_image = Image.Text(text, 0.8, 0.9, 1.0, 1.0);
+    message_sprite.SetImage(my_image);
+}
+
+Plymouth.SetMessageFunction(message_callback);
+
+
+total_frames = 16;
+wm_width = 300;
+wm_height = 100;
+
+for (i = 0; i < total_frames; i++) {
+    wm_images[i] = Image((i + 1) + ".png").Scale(wm_width, wm_height);
+}
+
+wm_sprite = Sprite();
+wm_sprite.SetImage(wm_images[0]);
+wm_sprite.SetX((Window.GetWidth() - wm_width) / 2);
+wm_sprite.SetY(Window.GetHeight() - wm_height - 80);
+wm_sprite.SetOpacity(1);
+
+wm_frame = 0;
+wm_tick = 0;
+
+fun refresh_callback () {
+    wm_tick++;
+    if (wm_tick % 3 == 0) {
+        wm_sprite.SetImage(wm_images[wm_frame]);
+        wm_frame = (wm_frame + 1) % total_frames;
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+
+update-alternatives --install \
+/usr/share/plymouth/themes/default.plymouth \
+default.plymouth \
+/usr/share/plymouth/themes/netra-logo/netra-logo.plymouth \
+200
+
+
+update-alternatives --set default.plymouth \
+/usr/share/plymouth/themes/netra-logo/netra-logo.plymouth
+
+
+readlink -f /usr/share/plymouth/themes/default.plymouth
+update-alternatives --query default.plymouth
+
+8. ganti wallpaper
+cd /usr/share/backgrounds
+
+///terminal lain:
+sudo cp netra-source-code/remaster/foto.png ~/netra/root/usr/share/backgrounds/
+
+cp foto.png ubuntu-default-greyscale-wallpaper.png
+cp foto.png ubuntu-wallpaper-d.png
+mv foto.png warty-final-ubuntu.png
+
+9. identitas 
+nano /etc/os-release
+ubah jadi:
+PRETTY_NAME="Netra OS 1.0 LTS"
+NAME="Netra OS"
+VERSION_ID="1.0"
+VERSION="1.0 LTS (Kelompok 6)"
+VERSION_CODENAME=resolute
+ID=netraos
+ID_LIKE=debian
+HOME_URL="https://netra-os.vercel.app/"
+SUPPORT_URL="https://netra-os.vercel.app/"
+BUG_REPORT_URL="https://netra-os.vercel.app"
+PRIVACY_POLICY_URL="https://netra-os.vercel.app"
+UBUNTU_CODENAME=resolute
+LOGO=ubuntu-logo
+
+10. welcome text
+nano /etc/issue
+ubah jdi:
+Netra OS 1.0 LTS \n \l
+
+nano /etc/issue.net
+ubah jadi: Netra OS 1.0 LTS
+
+11. ganti login logo
+cd /usr/share/pixmaps
+
+///terminal lain:
+sudo cp netra-source-code/remaster/watermark.png ~/netra/root/usr/share/pixmaps/
+
+mv watermark.png /usr/share/pixmaps/custom-login-logo.png
+chmod 644 /usr/share/pixmaps/custom-login-logo.png
+
+mkdir -p /etc/dconf/profile
+nano /etc/dconf/profile/gdm
+
+user-db:user
+system-db:gdm
+file-db:/usr/share/gdm/greeter-dconf-defaults
+
+
+mkdir -p /etc/dconf/db/gdm.d
+nano /etc/dconf/db/gdm.d/01-custom-logo
+
+[org/gnome/login-screen]
+logo='/usr/share/pixmaps/custom-login-logo.png'
+
+12. ganti start logo
+apt install -y gnome-shell-extensions papirus-icon-theme fonts-jetbrains-mono
+
+mkdir -p /usr/share/themes/CustomAppIcon/gnome-shell
+cd /usr/share/themes/CustomAppIcon/gnome-shell
+///terminal lain:
+sudo cp netra-source-code/remaster/logo-netra.svg ~/netra/root/usr/share/themes/CustomAppIcon/gnome-shell/
+
+mv logo-netra.svg /usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg
+nano /usr/share/themes/CustomAppIcon/gnome-shell/gnome-shell.css
+
+#dashtodockContainer .show-apps,
+.show-apps {
+  padding: 0px !important;
+  margin: 0px !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon,
+.show-apps .overview-icon {
+  width: 56px !important;
+  height: 56px !important;
+  padding: 0px !important;
+  margin: 0px !important;
+  margin-bottom: 5px !important;
+  border-radius: 12px !important;
+  background-image: url("file:///usr/share/themes/CustomAppIcon/gnome-shell/app-grid-icon.svg") !important;
+  background-size: 54px 54px !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+
+#dashtodockContainer .show-apps .overview-icon StIcon,
+.show-apps .overview-icon StIcon {
+  color: transparent !important;
+  icon-size: 0px !important;
+  width: 0px !important;
+  height: 0px !important;
+  opacity: 0 !important;
+}
+
+#panel {
+  background-color: rgba(15, 23, 30, 0.88) !important;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.25) !important;
+  height: 30px !important;
+  font-size: 10.5pt !important;
+}
+
+#panel .panel-button {
+  color: #e2e8f0 !important;
+}
+
+#panel .panel-button:hover,
+#panel .panel-button:active,
+#panel .panel-button:checked {
+  background-color: rgba(56, 189, 248, 0.18) !important;
+  color: #38bdf8 !important;
+  border-radius: 6px !important;
+}
+
+#dashtodockContainer #dash .dash-background {
+  background-color: rgba(15, 23, 30, 0.85) !important;
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  border-radius: 16px !important;
+}
+
+#dashtodockContainer .app-well-app-running-dot {
+  background-color: #38bdf8 !important;
+  width: 6px !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+}
+
+nano /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
+
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+gtk-theme='Yaru-dark'
+icon-theme='Papirus-Dark'
+accent-color='teal'
+font-name='Ubuntu Sans 10.5'
+monospace-font-name='JetBrains Mono 10.5'
+clock-show-seconds=true
+clock-show-weekday=true
+
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/warty-final-ubuntu.png'
+picture-uri-dark='file:///usr/share/backgrounds/warty-final-ubuntu.png'
+
+[org.gnome.shell.extensions.dash-to-dock]
+dock-position='BOTTOM'
+dock-fixed=false
+extend-height=false
+dash-max-icon-size=44
+show-trash=false
+show-mounts=false
+
+[org.gnome.shell.extensions.ding]
+show-home=false
+
+[org.gnome.shell]
+disable-extension-version-validation=true
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+
+[org.gnome.shell:ubuntu]
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'ubuntu-appindicators@ubuntu.com', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+
+[org.gnome.shell.extensions.user-theme]
+name='CustomAppIcon'
+
+chmod -R 755 /usr/share/themes/CustomAppIcon
+chmod 644 /usr/share/glib-2.0/schemas/zz_custom-distro.gschema.override
+glib-compile-schemas /usr/share/glib-2.0/schemas/
+
+13. skrip auto open guide via browser
+nano /usr/local/bin/netra-welcome.sh
+
+#!/bin/bash
+
+while pgrep -x "gnome-initial-setup" > /dev/null || pgrep -x "oem-config" > /dev/null || pgrep -f "subiquity" > /dev/null; do
+    sleep 4
+done
+
+MARKER="$HOME/.config/netra-welcome-done"
+
+if [ -f "$MARKER" ]; then
+    exit 0
+fi
+
+sleep 10
+
+# Buka halaman GitHub Netra OS
+if xdg-open "https://netra-os.vercel.app" >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config"
+    touch "$MARKER"
+fi
+
+exit 0
+
+
+
+chmod +x /usr/local/bin/netra-welcome.sh
+mkdir -p /etc/xdg/autostart
+
+
+nano /etc/xdg/autostart/netra-welcome.desktop
+
+[Desktop Entry]
+Type=Application
+Name=Netra OS Welcome
+Comment=Open Netra OS Welcome Page
+Exec=/usr/local/bin/netra-welcome.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true
+
+14. fav-apps
+mkdir -p /etc/dconf/db/local.d/
+nano /etc/dconf/db/local.d/01-favorite-apps
+
+[org/gnome/shell]
+favorite-apps=['brave-browser.desktop', 'org.wireshark.Wireshark.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'yelp.desktop']
+
+
+nano /etc/dconf/profile/user
+
+user-db:user
+system-db:local
+
+15. finishing
+dconf update
+update-initramfs -u -k all
+
+16. Bersihkan Cache & Keluar dari Chroot
+apt clean
+apt autoclean
+rm -rf /var/lib/apt/lists/*
+rm -rf /tmp/* /var/tmp/* ~/.bash_history
+exit
+
+\\\\\\\\\
+# ==========================================
+# BAGIAN 3: BUILD & CETAK ISO (SETELAH KELUAR CHROOT)
+# ==========================================
+
+# 1. Lepas mount sistem virtual
+sudo umount -lf ~/netra/root/dev/pts ~/netra/root/dev ~/netra/root/run ~/netra/root/proc ~/netra/root/sys 2>/dev/null
+
+# 2. Kemas Ulang SquashFS & Update minimal.size (mengarah ke folder 'iso')
+sudo rm -f ~/netra/iso/casper/minimal.squashfs ~/netra/iso/casper/minimal.size
+
+sudo mksquashfs ~/netra/root ~/netra/iso/casper/minimal.squashfs -comp zstd -Xcompression-level 15 -noappend
+
+# Hitung ukuran filesystem akurat pakai sudo
+printf $(sudo du -s --bytes ~/netra/root | cut -f1) | sudo tee ~/netra/iso/casper/minimal.size
+
+# 3. Ubah Metadata Disk (mengarah ke folder 'iso')
+echo 'Netra OS 1.0 LTS amd64 "Kelompok 6"' > ~/netra/iso/.disk/info
+echo 'https://netra-os.vercel.app/' > ~/netra/iso/.disk/release_notes_url
+
+# 4. Perbarui Checksum MD5 (mengarah ke folder 'iso')
+cd ~/netra/iso
+rm -f md5sum.txt
+find -type f -print0 | xargs -0 md5sum | grep -v "./boot/" | grep -v "./md5sum.txt" > md5sum.txt
+
+# 5. Cetak File ISO Final (menggunakan folder 'iso' sebagai sumber)
+cd ~/netra
+sudo xorriso -as mkisofs \
+  -iso-level 3 \
+  -full-iso9660-filenames \
+  -volid "Netra OS 1.0 LTS amd64" \
+  -eltorito-boot boot/grub/i386-pc/eltorito.img \
+  -eltorito-catalog boot/grub/i386-pc/boot.catalog \
+  -no-emul-boot -boot-load-size 4 -boot-info-table \
+  -eltorito-alt-boot \
+  -e EFI/boot/bootx64.efi \
+  -no-emul-boot -isohybrid-gpt-basdat \
+  -output ~/netra/netra-os1.0-desktop-amd64.iso \
+  ~/netra/iso
